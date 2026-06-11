@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Clone v2.1</title>
+    <style>
+        :root {
+            --bg-primary: #313338;
+            --bg-secondary: #2b2d31;
+            --bg-tertiary: #1e1f22;
+            --text-normal: #dbdee1;
+            --text-muted: #949ba4;
+            --blurple: #5865f2;
+            --danger: #f23f43;
+            --success: #23a55a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: var(--bg-primary); color: var(--text-normal); height: 100vh; display: flex; overflow: hidden; }
+
+        /* AUTH SCREEN */
+        #auth-screen { position: fixed; inset: 0; background: var(--bg-tertiary); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .auth-box { background: var(--bg-primary); padding: 40px; border-radius: 8px; width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
+        .auth-box h2 { text-align: center; margin-bottom: 20px; color: white; }
+        input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 4px; border: none; background: var(--bg-tertiary); color: white; }
+        input:focus { outline: 2px solid var(--blurple); }
+        button { background: var(--blurple); cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #4752c4; }
+
+        /* MAIN LAYOUT */
+        #app-layout { display: none; width: 100%; height: 100%; }
+        
+        /* SERVERS SIDEBAR */
+        .servers-bar { width: 72px; background: var(--bg-tertiary); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 8px; border-right: 1px solid rgba(0,0,0,0.2); }
+        .server-icon { width: 48px; height: 48px; border-radius: 50%; background: var(--bg-primary); display: flex; justify-content: center; align-items: center; cursor: pointer; transition: 0.2s; font-weight: bold; color: var(--text-normal); user-select: none; }
+        .server-icon:hover, .server-icon.active { border-radius: 30%; background: var(--blurple); color: white; }
+
+        /* CHANNELS SIDEBAR */
+        .channels-bar { width: 240px; background: var(--bg-secondary); display: flex; flex-direction: column; justify-content: space-between; }
+        .nav-section { padding: 15px 10px; flex: 1; overflow-y: auto; }
+        .nav-section h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+        .nav-item { padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); }
+        .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.06); color: white; }
+
+        /* CHAT AREA */
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: var(--bg-primary); }
+        .chat-header { height: 48px; border-bottom: 1px solid rgba(0,0,0,0.3); display: flex; align-items: center; padding: 0 16px; font-weight: bold; justify-content: space-between; background: var(--bg-primary); }
+        .messages-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+        
+        /* MESSAGES STYLE */
+        .message { display: flex; gap: 16px; align-items: flex-start; padding: 4px 0; }
+        .message:hover { background: rgba(0,0,0,0.05); }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; }
+        .msg-content { flex: 1; }
+        .msg-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px; }
+        .msg-meta strong { color: white; font-size: 1rem; margin-right: 8px; cursor: pointer; }
+        .msg-meta strong:hover { text-decoration: underline; }
+        
+        .chat-input-area { padding: 0 20px 24px 20px; display: flex; gap: 12px; align-items: center; }
+        .chat-input-wrapper { flex: 1; background: #383a40; border-radius: 8px; display: flex; align-items: center; padding: 0 12px; }
+        .chat-input-wrapper input { background: transparent; margin: 0; padding: 12px 4px; }
+        .chat-input-wrapper input:focus { outline: none; }
+        
+        /* USER PROFILE FOOTER */
+        .user-footer { padding: 8px; background: #232428; display: flex; align-items: center; gap: 10px; }
+
+        /* MODALS */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); justify-content: center; align-items: center; z-index: 2000; }
+        .modal-content { background: var(--bg-primary); padding: 24px; border-radius: 8px; width: 450px; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.8); }
+        .modal-content h3 { margin-bottom: 15px; }
+
+        /* UTILITIES */
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #c93135; }
+        .report-btn { font-size: 11px; color: var(--danger); margin-left: 10px; cursor: pointer; visibility: hidden; }
+        .message:hover .report-btn { visibility: visible; }
+        .emoji-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 15px 0; }
+        .emoji-item { width: 40px; height: 40px; cursor: pointer; object-fit: contain; border-radius: 4px; }
+        .emoji-item:hover { background: rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen">
+        <div class="auth-box">
+            <h2>Vítejte na Discordu</h2>
+            <div id="auth-error" style="color: var(--danger); font-size: 13px; margin-bottom: 10px; text-align: center;"></div>
+            <label>E-mail</label>
+            <input type="email" id="auth-email" placeholder="name@domain.com" required>
+            <label>Uživatelské jméno (jen pro registraci)</label>
+            <input type="text" id="auth-username" placeholder="Uživatel">
+            <label>Heslo</label>
+            <input type="password" id="auth-password" placeholder="••••••••" required>
+            <button id="auth-btn">Pokračovat</button>
+        </div>
+    </div>
+
+    <div id="app-layout">
+        <div class="servers-bar" id="servers-list">
+            <div class="server-icon active" id="dm-home-btn">DM</div>
+            <div style="width: 32px; height: 2px; background: #35363c; margin: 4px 0;"></div>
+        </div>
+
+        <div class="channels-bar">
+            <div class="nav-section" id="nav-content"></div>
+            
+            <div class="user-footer">
+                <div class="avatar" id="current-user-avatar"></div>
+                <div style="flex: 1; overflow: hidden;">
+                    <div style="font-weight: bold; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;" id="current-user-name">Načítání...</div>
+                    <div style="font-size: 12px; color: var(--text-muted);" id="current-user-status">Online</div>
+                </div>
+                <button id="open-profile-btn" style="width: auto; padding: 6px 10px; margin: 0; font-size: 12px; background:#4e5058;">Profil</button>
+            </div>
+        </div>
+
+        <div class="chat-area">
+            <div class="chat-header">
+                <span id="chat-title">Vyberte konverzaci</span>
+                <div id="admin-zone-btn" style="display: none;">
+                    <button id="open-admin-btn" class="btn-danger" style="margin:0; padding: 6px 12px; width: auto;">Admin Panel</button>
+                </div>
+            </div>
+            
+            <div class="messages-container" id="messages-box"></div>
+
+            <div class="chat-input-area" id="input-area" style="display: none;">
+                <div class="chat-input-wrapper">
+                    <input type="file" id="file-upload" style="display: none;">
+                    <button id="trigger-file-btn" style="width: auto; background: none; margin:0; font-size: 20px; color: var(--text-muted);">+</button>
+                    <input type="text" id="message-input" placeholder="Napiš zprávu...">
+                    <button id="trigger-emoji-btn" style="width:auto; background:none; margin:0; font-size:20px;">😀</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="profile-modal" class="modal">
+        <div class="modal-content">
+            <h3>Nastavení uživatele</h3>
+            <label>URL Profilového obrázku</label>
+            <input type="text" id="profile-pic-url" placeholder="https://url-obrazku.cz/img.png">
+            <button id="save-profile-btn">Uložit profil</button>
+            <hr style="margin: 20px 0; border: 1px solid #35363c;">
+            <h3>Nahrát vlastní emotikon</h3>
+            <label>URL obrázku (bude dostupný všem na serverech)</label>
+            <input type="text" id="emoji-url" placeholder="https://url-obrazku.cz/emoji.png">
+            <button id="add-emoji-btn">Přidat do databáze</button>
+            <button id="close-profile-btn" class="btn-danger" style="margin-top:10px;">Zavřít</button>
+        </div>
+    </div>
+
+    <div id="emoji-modal" class="modal">
+        <div class="modal-content">
+            <h3>Vyber smajlíka</h3>
+            <div class="emoji-grid" id="emoji-picker-grid"></div>
+            <button id="close-emoji-btn" class="btn-danger">Zavřít</button>
+        </div>
+    </div>
+
+    <div id="admin-panel-modal" class="modal">
+        <div class="modal-content" style="width: 600px;">
+            <h2>Admin Control Center (Majitel)</h2>
+            <hr style="margin: 15px 0; border-color: #35363c;">
+            <h3>🚨 Nahlášené případy</h3>
+            <div id="admin-reports" style="margin-bottom: 20px; max-height: 200px; overflow-y:auto;"></div>
+            <h3>👥 Správa uživatelů & Servery</h3>
+            <div id="admin-management" style="max-height: 250px; overflow-y:auto;"></div>
+            <button id="close-admin-btn" class="btn-danger" style="margin-top: 15px;">Zavřít panel</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+        import { getDatabase, ref, set, get, onValue, push, remove } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC_zk04B0n_czSY9su3elHCNakgKGHvHoo",
+            authDomain: "discord-937a7.firebaseapp.com",
+            databaseURL: "https://discord-937a7-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "discord-937a7",
+            storageBucket: "discord-937a7.firebasestorage.app",
+            messagingSenderId: "728552261275",
+            appId: "1:728552261275:web:bdc44ef9eed764d010e83e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const ADMIN_EMAIL = "smatlakp003@gmail.com";
+        const MAX_FILE_SIZE = 90 * 1024 * 1024;
+        const SERVER_LIMIT = 123;
+
+        let currentUser = null;
+        let currentUserEmailClean = "";
+        let currentView = 'dms';
+        let activeTarget = null;
+        let serverCount = 0;
+        let activeChatRef = null;
+        let customEmojis = [];
+
+        function cleanEmail(email) { return email.replace(/\./g, ','); }
+
+        // Bindování eventů
+        document.getElementById('auth-btn').onclick = handleAuth;
+        document.getElementById('dm-home-btn').onclick = () => switchView('dms');
+        document.getElementById('open-profile-btn').onclick = () => openModal('profile-modal');
+        document.getElementById('close-profile-btn').onclick = () => closeModal('profile-modal');
+        document.getElementById('save-profile-btn').onclick = updateProfile;
+        document.getElementById('add-emoji-btn').onclick = addCustomEmoji;
+        document.getElementById('close-emoji-btn').onclick = () => closeModal('emoji-modal');
+        document.getElementById('trigger-emoji-btn').onclick = () => openModal('emoji-modal');
+        document.getElementById('trigger-file-btn').onclick = () => document.getElementById('file-upload').click();
+        document.getElementById('file-upload').onchange = (e) => handleFileUpload(e.target);
+        document.getElementById('open-admin-btn').onclick = openAdminPanel;
+        document.getElementById('close-admin-btn').onclick = () => closeModal('admin-panel-modal');
+        document.getElementById('message-input').onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+
+        window.addFriend = function() {
+            const email = document.getElementById('add-friend-email').value.trim();
+            if(!email || email === currentUser.email) return;
+            alert("Funkce spuštěna. Uživatelé se v reálném čase zobrazují níže v seznamu.");
+        };
+
+        async function handleAuth() {
+            const email = document.getElementById('auth-email').value.trim();
+            const username = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value;
+            const errorDiv = document.getElementById('auth-error');
+
+            if (!email || !password) { errorDiv.innerText = "Email a heslo jsou povinné!"; return; }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errorDiv.innerText = "Neplatný formát emailu!"; return; }
+
+            const clean = cleanEmail(email);
+            const userRef = ref(db, 'users/' + clean);
+            
+            const snapshot = await get(userRef);
+            const userData = snapshot.val();
+
+            if (userData) {
+                if (userData.banned) { errorDiv.innerText = "Tento účet byl zablokován!"; return; }
+                if (userData.password !== password) { errorDiv.innerText = "Nesprávné heslo!"; return; }
+                currentUser = userData;
+                currentUserEmailClean = clean;
+                loginSuccess();
+            } else {
+                if (!username) { errorDiv.innerText = "Účet neexistuje. Vyplňte jméno pro registraci."; return; }
+                const newUser = {
+                    email: email,
+                    username: username,
+                    password: password,
+                    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=' + username,
+                    banned: false,
+                    warned: false
+                };
+                await set(userRef, newUser);
+                currentUser = newUser;
+                currentUserEmailClean = clean;
+                loginSuccess();
+            }
+        }
+
+        function loginSuccess() {
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('app-layout').style.display = 'flex';
+            document.getElementById('current-user-name').innerText = currentUser.username;
+            document.getElementById('current-user-avatar').style.backgroundImage = `url('${currentUser.avatar}')`;
+            document.getElementById('profile-pic-url').value = currentUser.avatar;
+
+            if (currentUser.email === ADMIN_EMAIL) {
+                document.getElementById('admin-zone-btn').style.display = 'block';
+                document.getElementById('current-user-status').innerText = '👑 Majitel';
+            } else if (currentUser.warned) {
+                document.getElementById('current-user-status').innerText = '⚠️ Varován';
+            }
+
+            initSync();
+        }
+
+        function initSync() {
+            onValue(ref(db, 'servers'), snapshot => {
+                const servers = snapshot.val() || {};
+                serverCount = Object.keys(servers).length;
+                renderServersList(servers);
+            });
+
+            onValue(ref(db, 'emojis'), snapshot => {
+                customEmojis = snapshot.val() || [];
+            });
+            
+            switchView('dms');
+        }
+
+        function renderServersList(servers) {
+            const list = document.getElementById('servers-list');
+            list.innerHTML = `<div class="server-icon active" id="dm-home-wrapper">DM</div><div style="width: 32px; height: 2px; background: #35363c; margin: 4px 0;"></div>`;
+            document.getElementById('dm-home-wrapper').onclick = () => switchView('dms');
+
+            Object.keys(servers).forEach(id => {
+                const srv = servers[id];
+                const div = document.createElement('div');
+                div.className = 'server-icon';
+                if(activeTarget === id && currentView === 'server') div.classList.add('active');
+                div.innerText = srv.name.substring(0,3).toUpperCase();
+                div.onclick = () => switchView('server', id);
+                list.appendChild(div);
+            });
+
+            if (serverCount < SERVER_LIMIT) {
+                const addBtn = document.createElement('div');
+                addBtn.className = 'server-icon';
+                addBtn.style.background = 'var(--success)';
+                addBtn.innerText = '+';
+                addBtn.onclick = createServer;
+                list.appendChild(addBtn);
+            }
+        }
+
+        function createServer() {
+            if(serverCount >= SERVER_LIMIT) { alert("Dosažen limit 123 serverů!"); return; }
+            const name = prompt("Název serveru:");
+            if(!name) return;
+
+            const newId = 'server_' + Date.now();
+            set(ref(db, 'servers/' + newId), { id: newId, name: name, owner: currentUser.email });
+        }
+
+        function switchView(view, target = null) {
+            currentView = view;
+            activeTarget = target;
+            
+            const navContent = document.getElementById('nav-content');
+            const inputArea = document.getElementById('input-area');
+
+            if (view === 'dms') {
+                inputArea.style.display = target ? 'flex' : 'none';
+                let html = `<h3>Přímé zprávy</h3>
+                <input type="email" id="add-friend-email" placeholder="Přidat přítele (email)...">
+                <button onclick="addFriend()">Hledat uživatele</button>
+                <div style="margin-top:15px; font-weight:bold; font-size:11px; color:var(--text-muted);">UŽIVATELÉ ONLINE</div>`;
+
+                get(ref(db, 'users')).then(snapshot => {
+                    const users = snapshot.val() || {};
+                    Object.keys(users).forEach(uClean => {
+                        if(users[uClean].email !== currentUser.email) {
+                            html += `<div class="nav-item ${target === uClean ? 'active' : ''}" id="dm-${uClean}">🟢 ${users[uClean].username}</div>`;
+                        }
+                    });
+                    navContent.innerHTML = html;
+
+                    Object.keys(users).forEach(uClean => {
+                        if(users[uClean].email !== currentUser.email) {
+                            document.getElementById(`dm-${uClean}`).onclick = () => switchView('dms', uClean);
+                        }
+                    });
+                });
+
+                if(target) {
+                    get(ref(db, 'users/' + target)).then(s => {
+                        document.getElementById('chat-title').innerText = `@ ${s.val().username}`;
+                        listenToMessages('dms/' + [currentUserEmailClean, target].sort().join('_'));
+                    });
+                } else {
+                    document.getElementById('chat-title').innerText = `Vyber uživatele pro chat.`;
+                    document.getElementById('messages-box').innerHTML = '';
+                }
+            } else {
+                inputArea.style.display = 'flex';
+                get(ref(db, 'servers/' + target)).then(snapshot => {
+                    const srv = snapshot.val();
+                    navContent.innerHTML = `<h3>${srv.name}</h3><p style="font-size:10px; color:var(--text-muted)">Vlastník: ${srv.owner}</p><div class="nav-item active"># obecné</div>`;
+                    document.getElementById('chat-title').innerText = `🏠 ${srv.name} > # obecné`;
+                    listenToMessages('servers/' + target + '/messages');
+                });
+            }
+        }
+
+        function listenToMessages(path) {
+            activeChatRef = ref(db, path);
+            onValue(activeChatRef, snapshot => {
+                const box = document.getElementById('messages-box');
+                box.innerHTML = '';
+                const msgs = snapshot.val() || {};
+                
+                Object.keys(msgs).forEach(mId => {
+                    const m = msgs[mId];
+                    let textHtml = m.text;
+                    
+                    customEmojis.forEach(url => {
+                        textHtml = textHtml.split(`[emoji:${url}]`).join(`<img src="${url}" class="emoji-item" style="width:22px;height:22px;vertical-align:middle;">`);
+                    });
+
+                    const div = document.createElement('div');
+                    div.className = 'message';
+                    div.innerHTML = `
+                        <div class="avatar" style="background-image:url('${m.avatar}')"></div>
+                        <div class="msg-content">
+                            <div class="msg-meta">
+                                <strong>${m.username}</strong> <span style="font-size:11px;">${m.time}</span>
+                                <span class="report-btn" id="rep-${mId}">[Nahlásit]</span>
+                            </div>
+                            <div>${textHtml}</div>
+                        </div>`;
+                    box.appendChild(div);
+                    
+                    document.getElementById(`rep-${mId}`).onclick = () => reportUser(m.sender, m.text);
+                });
+                box.scrollTop = box.scrollHeight;
+            });
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            if(!text || !activeChatRef) return;
+
+            const msg = {
+                sender: currentUser.email,
+                username: currentUser.username,
+                avatar: currentUser.avatar,
+                text: text,
+                time: new Date().toLocaleTimeString()
+            };
+
+            push(activeChatRef, msg);
+            input.value = '';
+        }
+
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if(!file) return;
+            if(file.size > MAX_FILE_SIZE) { alert("Soubor překračuje limit 90MB!"); return; }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const link = `<a href="${e.target.result}" download="${file.name}" style="color:var(--blurple); font-weight:bold;">📁 Soubor: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)</a>`;
+                push(activeChatRef, {
+                    sender: currentUser.email, username: currentUser.username, avatar: currentUser.avatar,
+                    text: link, time: new Date().toLocaleTimeString()
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateProfile() {
+            const url = document.getElementById('profile-pic-url').value;
+            set(ref(db, 'users/' + currentUserEmailClean + '/avatar'), url);
+            currentUser.avatar = url;
+            document.getElementById('current-user-avatar').style.backgroundImage = `url('${url}')`;
+            closeModal('profile-modal');
+        }
+
+        function addCustomEmoji() {
+            const url = document.getElementById('emoji-url').value.trim();
+            if(!url) return;
+            get(ref(db, 'emojis')).then(s => {
+                let current = s.val() || [];
+                if(!current.includes(url)) {
+                    current.push(url);
+                    set(ref(db, 'emojis'), current);
+                    alert("Smajlík uložen globálně!");
+                }
+            });
+        }
+
+        function reportUser(email, text) {
+            const reason = prompt("Důvod nahlášení:");
+            if(!reason) return;
+            push(ref(db, 'reports'), { reporter: currentUser.email, target: email, reason: reason, text: text });
+            alert("Nahlášeno majiteli.");
+        }
+
+        function openAdminPanel() {
+            if(currentUser.email !== ADMIN_EMAIL) return;
+            openModal('admin-panel-modal');
+
+            onValue(ref(db, 'reports'), s => {
+                const reports = s.val() || {};
+                const div = document.getElementById('admin-reports');
+                div.innerHTML = '';
+                Object.keys(reports).forEach(id => {
+                    const r = reports[id];
+                    div.innerHTML += `<div style="background:rgba(0,0,0,0.2); padding:10px; margin-bottom:5px; font-size:13px; border-left: 3px solid red;">
+                        <strong>Hříšník:</strong> ${r.target}<br><strong>Důvod:</strong> ${r.reason}<br><strong>Zpráva:</strong> ${r.text}<br>
+                        <button id="del-rep-${id}" style="width:auto; padding:2px 5px; background:gray;">Vyřešeno</button>
+                    </div>`;
+                });
+                Object.keys(reports).forEach(id => {
+                    document.getElementById(`del-rep-${id}`).onclick = () => remove(ref(db, 'reports/' + id));
+                });
+            });
+
+            get(ref(db, 'users')).then(s => {
+                const users = s.val() || {};
+                const div = document.getElementById('admin-management');
+                div.innerHTML = '<h4>Uživatelé:</h4>';
+                Object.keys(users).forEach(k => {
+                    if(users[k].email === ADMIN_EMAIL) return;
+                    div.innerHTML += `<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; background:rgba(255,255,255,0.02); padding:4px;">
+                        <span>${users[k].username} (${users[k].email}) ${users[k].warned ? '⚠️ Varován' : ''} ${users[k].banned ? '🚫 Banned' : ''}</span>
+                        <div>
+                            <button id="warn-${k}" style="width:auto; padding:2px; background:orange;">Varovat</button>
+                            <button id="ban-${k}" style="width:auto; padding:2px; background:red;">Ban</button>
+                        </div>
+                    </div>`;
+                });
+
+                Object.keys(users).forEach(k => {
+                    if(users[k].email === ADMIN_EMAIL) return;
+                    document.getElementById(`warn-${k}`).onclick = () => set(ref(db, `users/${k}/warned`), true).then(openAdminPanel);
+                    document.getElementById(`ban-${k}`).onclick = () => set(ref(db, `users/${k}/banned`), true).then(openAdminPanel);
+                });
+            });
+        }
+
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+            if(id === 'emoji-modal') {
+                const grid = document.getElementById('emoji-picker-grid'); grid.innerHTML = '';
+                const base = ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉'];
+                base.forEach(em => {
+                    const span = document.createElement('span'); span.style.fontSize='28px'; span.style.cursor='pointer'; span.innerText = em;
+                    span.onclick = () => { document.getElementById('message-input').value += em; closeModal('emoji-modal'); };
+                    grid.appendChild(span);
+                });
+                customEmojis.forEach(url => {
+                    const img = document.createElement('img'); img.src = url; img.className = 'emoji-item';
+                    img.onclick = () => { document.getElementById('message-input').value += `[emoji:${url}]`; closeModal('emoji-modal'); };
+                    grid.appendChild(img);
+                });
+            }
+        }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    </script>
+</body>
+</html>
